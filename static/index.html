@@ -6,20 +6,24 @@
     <title>WhatsApp Diary</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body class="bg-gray-50 text-gray-900">
+  <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors">
     <div class="max-w-3xl mx-auto p-6">
-      <h1 class="text-2xl font-semibold mb-4">WhatsApp Diary</h1>
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-semibold">WhatsApp Diary</h1>
+        <button id="theme-toggle" class="px-3 py-2 rounded border text-sm dark:border-gray-700">Toggle theme</button>
+      </div>
 
-      <section class="mb-8 p-4 border rounded bg-white">
+      <section class="mb-8 p-4 border rounded bg-white dark:bg-gray-800 dark:border-gray-700">
         <h2 class="font-medium mb-2">Import exported chat (.txt)</h2>
         <form id="import-form" class="flex items-center gap-3" enctype="multipart/form-data">
           <input type="file" name="file" accept=".txt" class="block" required />
           <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Import</button>
           <span id="import-status" class="text-sm text-gray-600"></span>
         </form>
+        <div id="dropzone" class="mt-3 p-4 border-2 border-dashed rounded text-sm text-gray-600 dark:text-gray-300 dark:border-gray-700">Drag & drop a .txt export here to import</div>
       </section>
 
-      <section class="mb-8 p-4 border rounded bg-white">
+      <section class="mb-8 p-4 border rounded bg-white dark:bg-gray-800 dark:border-gray-700">
         <h2 class="font-medium mb-2">Quick search</h2>
         <form id="search-form" class="flex items-center gap-3">
           <input id="search-q" type="text" placeholder="Search..." class="flex-1 rounded border px-3 py-2" />
@@ -29,7 +33,7 @@
         <ul id="search-results" class="mt-4 space-y-2"></ul>
       </section>
 
-      <section class="mb-8 p-4 border rounded bg-white">
+      <section class="mb-8 p-4 border rounded bg-white dark:bg-gray-800 dark:border-gray-700">
         <h2 class="font-medium mb-2">Ask a question</h2>
         <form id="ask-form" class="flex items-center gap-3">
           <input id="ask-q" type="text" placeholder="What happened last week?" class="flex-1 rounded border px-3 py-2" />
@@ -40,6 +44,18 @@
     </div>
 
     <script>
+      // Theme toggle
+      const applyThemeFromStorage = () => {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      };
+      applyThemeFromStorage();
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+
       const importForm = document.getElementById('import-form');
       const importStatus = document.getElementById('import-status');
       importForm.addEventListener('submit', async (e) => {
@@ -55,12 +71,63 @@
         }
       });
 
-      const renderItems = (container, items) => {
+      // Drag & drop import
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = importForm.querySelector('input[type="file"]');
+      if (dropzone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); }));
+        dropzone.addEventListener('dragover', () => dropzone.classList.add('border-blue-400'));
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-400'));
+        dropzone.addEventListener('drop', async (e) => {
+          dropzone.classList.remove('border-blue-400');
+          const file = e.dataTransfer.files && e.dataTransfer.files[0];
+          if (!file) return;
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fileInput.files = dt.files;
+          importForm.dispatchEvent(new Event('submit'));
+        });
+      }
+
+      const escapeHTML = (s) => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const highlight = (text, q) => {
+        if (!q) return escapeHTML(text);
+        const re = new RegExp(escapeRegExp(q), 'gi');
+        return escapeHTML(text).replace(re, (m) => `<mark class=\"bg-yellow-200 text-black\">${escapeHTML(m)}</mark>`);
+      };
+
+      const renderItems = (container, items, q = '') => {
         container.innerHTML = '';
         for (const it of items) {
           const li = document.createElement('li');
-          li.className = 'p-3 border rounded';
-          li.innerHTML = `<div class="text-sm text-gray-500">${new Date(it.timestamp).toLocaleString()} — ${it.sender || 'System'}</div><div>${it.text}</div>`;
+          li.className = 'p-3 border rounded dark:border-gray-700';
+          const ts = new Date(it.timestamp);
+          const full = it.text || '';
+          const short = full.length > 280 ? full.slice(0, 280) + '…' : full;
+          const needsToggle = full.length > 280;
+          const header = `<div class=\"text-sm text-gray-500 dark:text-gray-300\" title=\"${ts.toISOString()}\">${ts.toLocaleString()} — ${escapeHTML(it.sender || 'System')}</div>`;
+          const bodyShort = `<div class=\"mt-1\" data-role=\"body-short\">${highlight(short, q)}</div>`;
+          const bodyFull = `<div class=\"mt-1 hidden\" data-role=\"body-full\">${highlight(full, q)}</div>`;
+          const toggle = needsToggle ? `<button class=\"mt-2 text-sm text-blue-600\" data-role=\"toggle\">Show more</button>` : '';
+          li.innerHTML = `${header}${bodyShort}${bodyFull}${toggle}`;
+          if (needsToggle) {
+            const toggleBtn = li.querySelector('[data-role="toggle"]');
+            const shortEl = li.querySelector('[data-role="body-short"]');
+            const fullEl = li.querySelector('[data-role="body-full"]');
+            toggleBtn.addEventListener('click', () => {
+              const expanded = !fullEl.classList.contains('hidden');
+              if (expanded) {
+                fullEl.classList.add('hidden');
+                shortEl.classList.remove('hidden');
+                toggleBtn.textContent = 'Show more';
+              } else {
+                shortEl.classList.add('hidden');
+                fullEl.classList.remove('hidden');
+                toggleBtn.textContent = 'Show less';
+              }
+            });
+          }
           container.appendChild(li);
         }
       };
@@ -69,6 +136,8 @@
       const searchQ = document.getElementById('search-q');
       const searchResults = document.getElementById('search-results');
       const searchStatus = document.getElementById('search-status');
+      // restore last query
+      searchQ.value = localStorage.getItem('lastQuery') || '';
       searchForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const q = searchQ.value.trim();
@@ -77,11 +146,12 @@
           searchResults.innerHTML = '';
           return;
         }
+        localStorage.setItem('lastQuery', q);
         searchStatus.textContent = 'Searching...';
         try {
           const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
           const json = await res.json();
-          renderItems(searchResults, json.results);
+          renderItems(searchResults, json.results, q);
           searchStatus.textContent = json.results.length ? `Found ${json.results.length} messages` : 'No results found';
         } catch (err) {
           searchStatus.textContent = 'Search failed';
@@ -99,7 +169,7 @@
         data.set('question', q);
         const res = await fetch('/ask', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: data });
         const json = await res.json();
-        renderItems(askResults, json.results);
+        renderItems(askResults, json.results, q);
       });
     </script>
   </body>
