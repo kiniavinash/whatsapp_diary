@@ -25,6 +25,7 @@
           <input id="search-q" type="text" placeholder="Search..." class="flex-1 rounded border px-3 py-2" />
           <button type="submit" class="px-3 py-2 bg-gray-800 text-white rounded">Search</button>
         </form>
+        <div id="search-status" class="text-sm text-gray-600 mt-2"></div>
         <ul id="search-results" class="mt-4 space-y-2"></ul>
       </section>
 
@@ -67,13 +68,24 @@
       const searchForm = document.getElementById('search-form');
       const searchQ = document.getElementById('search-q');
       const searchResults = document.getElementById('search-results');
+      const searchStatus = document.getElementById('search-status');
       searchForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const q = searchQ.value.trim();
-        if (!q) return;
-        const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
-        const json = await res.json();
-        renderItems(searchResults, json.results);
+        if (!q) {
+          searchStatus.textContent = 'Type something to search';
+          searchResults.innerHTML = '';
+          return;
+        }
+        searchStatus.textContent = 'Searching...';
+        try {
+          const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+          const json = await res.json();
+          renderItems(searchResults, json.results);
+          searchStatus.textContent = json.results.length ? `Found ${json.results.length} messages` : 'No results found';
+        } catch (err) {
+          searchStatus.textContent = 'Search failed';
+        }
       });
 
       const askForm = document.getElementById('ask-form');
