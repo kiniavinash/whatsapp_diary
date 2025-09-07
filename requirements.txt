@@ -6,6 +6,8 @@ SQLAlchemy==2.0.32
 alembic==1.13.2
 jinja2==3.1.4
 httpx==0.27.0
+# Dev/test
+pytest==8.3.2
 # Embeddings/RAG to be added in a later step
 # chromadb==0.5.5
 # sentence-transformers==3.0.1

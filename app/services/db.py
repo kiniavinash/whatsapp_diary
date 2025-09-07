@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine, String, DateTime, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, Mapped, mapped_column
@@ -28,6 +29,7 @@ class Message(Base):
     )
 
 
+@contextmanager
 def get_session() -> Iterator[Session]:
     session: Session = SessionLocal()
     try:
