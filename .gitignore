@@ -9,8 +9,7 @@ venv/
 
 # Data & uploads
 data/
-exports/*.txt
-exports/*.zip
+exports/
 
 # OS/editor
 .DS_Store
