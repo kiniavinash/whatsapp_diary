@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WhatsApp Diary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <div class="max-w-3xl mx-auto p-6">
+      <h1 class="text-2xl font-semibold mb-4">WhatsApp Diary</h1>
+
+      <section class="mb-8 p-4 border rounded bg-white">
+        <h2 class="font-medium mb-2">Import exported chat (.txt)</h2>
+        <form id="import-form" class="flex items-center gap-3" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".txt" class="block" required />
+          <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Import</button>
+          <span id="import-status" class="text-sm text-gray-600"></span>
+        </form>
+      </section>
+
+      <section class="mb-8 p-4 border rounded bg-white">
+        <h2 class="font-medium mb-2">Quick search</h2>
+        <form id="search-form" class="flex items-center gap-3">
+          <input id="search-q" type="text" placeholder="Search..." class="flex-1 rounded border px-3 py-2" />
+          <button type="submit" class="px-3 py-2 bg-gray-800 text-white rounded">Search</button>
+        </form>
+        <ul id="search-results" class="mt-4 space-y-2"></ul>
+      </section>
+
+      <section class="mb-8 p-4 border rounded bg-white">
+        <h2 class="font-medium mb-2">Ask a question</h2>
+        <form id="ask-form" class="flex items-center gap-3">
+          <input id="ask-q" type="text" placeholder="What happened last week?" class="flex-1 rounded border px-3 py-2" />
+          <button type="submit" class="px-3 py-2 bg-emerald-600 text-white rounded">Ask</button>
+        </form>
+        <ul id="ask-results" class="mt-4 space-y-2"></ul>
+      </section>
+    </div>
+
+    <script>
+      const importForm = document.getElementById('import-form');
+      const importStatus = document.getElementById('import-status');
+      importForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(importForm);
+        importStatus.textContent = 'Uploading...';
+        try {
+          const res = await fetch('/import', { method: 'POST', body: formData });
+          const json = await res.json();
+          importStatus.textContent = `Imported ${json.imported}, skipped ${json.skipped}`;
+        } catch (err) {
+          importStatus.textContent = 'Import failed';
+        }
+      });
+
+      const renderItems = (container, items) => {
+        container.innerHTML = '';
+        for (const it of items) {
+          const li = document.createElement('li');
+          li.className = 'p-3 border rounded';
+          li.innerHTML = `<div class="text-sm text-gray-500">${new Date(it.timestamp).toLocaleString()} — ${it.sender || 'System'}</div><div>${it.text}</div>`;
+          container.appendChild(li);
+        }
+      };
+
+      const searchForm = document.getElementById('search-form');
+      const searchQ = document.getElementById('search-q');
+      const searchResults = document.getElementById('search-results');
+      searchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = searchQ.value.trim();
+        if (!q) return;
+        const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+        renderItems(searchResults, json.results);
+      });
+
+      const askForm = document.getElementById('ask-form');
+      const askQ = document.getElementById('ask-q');
+      const askResults = document.getElementById('ask-results');
+      askForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = askQ.value.trim();
+        if (!q) return;
+        const data = new URLSearchParams();
+        data.set('question', q);
+        const res = await fetch('/ask', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: data });
+        const json = await res.json();
+        renderItems(askResults, json.results);
+      });
+    </script>
+  </body>
+  </html>
+
+
